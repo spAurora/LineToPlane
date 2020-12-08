@@ -1,4 +1,4 @@
-﻿生成启动时间为 2020/12/8 16:36:13。
+﻿生成启动时间为 2020/12/8 18:04:04。
      1>项目“C:\Users\75198\OneDrive\LineToPlane\LineToPlane\LineToPlane.vcxproj”在节点 2 上(build 个目标)。
      1>InitializeBuildStatus:
          正在创建“Debug\LineToPlane.unsuccessfulbuild”，因为已指定“AlwaysCreate”。
@@ -39,4 +39,4 @@
 
 生成成功。
 
-已用时间 00:00:01.27
+已用时间 00:00:01.35
