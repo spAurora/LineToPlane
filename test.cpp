@@ -8,6 +8,66 @@
 
 using namespace std;
 
+/*
+* @brief ConvertPolylineToPolygon        转换线为面
+* @param[in] OGRGeometry* polygon        要转换的面
+* @return OGRGeometry*            　　　　转换成功后的线
+* @author 
+* @date 
+* @note 
+*/
+OGRGeometry* ConvertPolylineToPolygon(OGRGeometry* polyline)
+{
+	// 线生成
+	OGRwkbGeometryType sourceGeometryType=polyline->getGeometryType();
+	sourceGeometryType=wkbFlatten(sourceGeometryType);
+
+	OGRwkbGeometryType targetGeometryType;
+	switch(sourceGeometryType)
+	{
+	case OGRwkbGeometryType::wkbLineString:
+		{
+			OGRLineString* pOGRLineString=(OGRLineString*) polyline;
+			targetGeometryType = OGRwkbGeometryType::wkbPolygon;
+
+			OGRPolygon* pOGRPolygon=(OGRPolygon*)OGRGeometryFactory::createGeometry(targetGeometryType);
+
+			OGRLinearRing pOGRLinearRing;
+			int pointCount=pOGRLineString->getNumPoints();
+			double x=0; double y=0;
+			for(int i=0;i<pointCount;i++)
+			{    
+				x=pOGRLineString->getX(i);
+				y=pOGRLineString->getY(i);
+				pOGRLinearRing.addPoint(x,y);
+			}
+			pOGRLinearRing.closeRings();
+			pOGRPolygon->addRing(&pOGRLinearRing);
+			return pOGRPolygon;
+		}
+	case OGRwkbGeometryType::wkbMultiLineString:
+		{
+			targetGeometryType = OGRwkbGeometryType::wkbMultiPolygon;
+			OGRMultiPolygon* pOGRMultiPolygon=(OGRMultiPolygon*)OGRGeometryFactory::createGeometry(targetGeometryType);
+
+			OGRGeometryCollection* pOGRPolylines=(OGRGeometryCollection*)polyline;
+			int geometryCount=pOGRPolylines->getNumGeometries();
+
+			for(int i=0;i<geometryCount;i++)
+			{
+				OGRGeometry* pOGRGeo=ConvertPolylineToPolygon(pOGRPolylines->getGeometryRef(i));
+				pOGRMultiPolygon->addGeometry(pOGRGeo);
+			}
+
+			return pOGRMultiPolygon;
+		}
+	default:
+		return NULL;
+	}
+
+	return NULL;
+}
+
 int main()
 {
 	//设置GDAL_DATA目录
