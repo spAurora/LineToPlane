@@ -1,9 +1,3 @@
-#ifdef _UNICODE
-#define tString wstring
-#else
-#define tString string
-#endif
-
 #include <stdio.h>
 #include <iostream>
 #include <vector>
@@ -15,66 +9,37 @@
 
 using namespace std;
 
-bool ReadDXF(string filePath, vector<vector<OGRPoint>>& vertexPoint)
-{	
-	//GDALDataset *poDS = (GDALDataset*)GDALOpenEx(filePath.c_str(), GDAL_OF_VECTOR, NULL, NULL, NULL);
-	OGRDataSource *poDS = OGRSFDriverRegistrar::Open( filePath.c_str(), FALSE );
-	if (!poDS)
-	{
-		printf("无法读取该文件，试检查格式是否正确！");
-		return false;
-	}
-	//if (poDS->GetLayerCount()<1)
-	//{
-	//	printf("该文件的层数小于1，试检查格式是否正确！");
-	//	return false;
-	//}
+OGRDataSource* CreateShapeFile(char* writePath, OGRSpatialReference* pOGRSpatialReference, OGRwkbGeometryType wkbtype = wkbPolygon)
+{
+	const char *pszDriverName = "ESRI Shapefile"; 
+	OGRSFDriver *poDriver;
 
-	OGRLayer  *poLayer = poDS->GetLayer(0); //读取层
-	poLayer->ResetReading();
+	OGRRegisterAll();  
 
-	OGRFeature *poFeature;
-	while ((poFeature = poLayer->GetNextFeature()) != NULL)
-	{
-		OGRGeometry *pGeo = poFeature->GetGeometryRef();
-		OGRwkbGeometryType pGeoType = pGeo->getGeometryType();
-
-		if (pGeoType == wkbLineString || pGeoType == wkbLineString25D)
-		{
-			OGRLinearRing  *pCurve = (OGRLinearRing*)pGeo;
-			if (pCurve->getNumPoints() < 1)
-			{
-				continue;
-			}
-
-			vector<OGRPoint> pl;
-			for (int i = 0; i<pCurve->getNumPoints(); i++)
-			{
-				OGRPoint point;
-				pCurve->getPoint(i, &point);						
-				pl.push_back(point);
-			}
-			vertexPoint.push_back(pl);
-		}
-
-		////		
-		//OGRFeatureDefn *poFDefn = poLayer->GetLayerDefn();		
-		//int n = poFDefn->GetFieldCount(); //获得字段的数目，不包括前两个字段（FID,Shape);
-		//for (int iField = 0; iField <n; iField++)
-		//{			
-		//    //输出每个字段的值
-		//    cout << poFeature->GetFieldAsString(iField) << "    ";			
-		//}
-		//cout << endl;   
-
-		OGRFeature::DestroyFeature(poFeature);
+	poDriver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(pszDriverName);
+	if (poDriver == NULL)  
+	{  
+		printf( "%s driver not available.\n", pszDriverName );
+		exit(-1);
 	}
 
-	//GDALClose(poDS);
-	OGRDataSource::DestroyDataSource(poDS);
-	poDS = nullptr;
-
-	return true;
+	OGRDataSource *poDS;  
+	poDS = poDriver->CreateDataSource(writePath, NULL);  
+	if (poDS == NULL)  
+	{  
+		printf("Create shapefile failed\n");
+		system("pause");
+		exit(1);
+	}
+	OGRLayer *poLayer;  
+	poLayer = poDS->CreateLayer("polygon1", NULL, wkbPolygon, NULL);  
+	if (poLayer == NULL)  
+	{  
+		printf("Layer create failed\n");  
+		system("pause");
+		exit(1);  
+	}
+	return poDS;
 }
 
 /*
@@ -89,11 +54,10 @@ bool ReadDXF(string filePath, vector<vector<OGRPoint>>& vertexPoint)
 * @date
 * @note 2015年11月04日 小八创建；
 */
-bool ConvertPolylineToPolygonEx(tString polylinePath,OGRLayer* pLayer,OGREnvelope envelope,vector<long> vecFIDs,OGRSpatialReference* pOGRSpatialReference)
+bool ConvertPolylineToPolygonEx(char* polylinePath,OGRLayer* pLayer,OGREnvelope envelope,vector<long> vecFIDs,OGRSpatialReference* pOGRSpatialReference)
 {
 	// 判断
 	if(pLayer==NULL) return false;
-	if(true==polylinePath.empty()) return false;
 
 	// 坐标系读取
 	OGRSpatialReference* pOGRSpatialReference_Source=pLayer->GetSpatialRef();
@@ -147,8 +111,10 @@ bool ConvertPolylineToPolygonEx(tString polylinePath,OGRLayer* pLayer,OGREnvelop
 			pTempGeometry=pOGRFeature_Old->GetGeometryRef();
 			if(false == isSameCoordSystem)pTempGeometry->transformTo(pOGRSpatialReference);
 
-			if(pTempGeometryUnion==NULL) pTempGeometryUnion=pTempGeometry;
-			else pTempGeometryUnion=pTempGeometryUnion->Union(pTempGeometry);
+			if(pTempGeometryUnion==NULL) 
+				pTempGeometryUnion=pTempGeometry;
+			else 
+				pTempGeometryUnion=pTempGeometryUnion->Union(pTempGeometry);
 
 			pOGRFeature_Old=pLayer->GetNextFeature();
 		}
@@ -203,6 +169,10 @@ bool ConvertPolylineToPolygonEx(tString polylinePath,OGRLayer* pLayer,OGREnvelop
 
 int main()
 {
+	char filePath[] = "D:\\420107.dxf";
+	char writePath[] = "D:\\polygon.shp";
+	OGRDataSource* poDS = nullptr;
+
 	//设置GDAL_DATA目录
 	CPLSetConfigOption("GDAL_DATA","D:\\GDAL\\data");
 
@@ -213,7 +183,7 @@ int main()
 	GDALAllRegister();
 	OGRRegisterAll();
 
-	 //解决中文乱码问题
+	//解决中文乱码问题
 	CPLSetConfigOption("SHAPE_ENCODING",""); 
 
 	//得到对应文件类型处理器
@@ -225,15 +195,25 @@ int main()
 	}
 
 	//打开文件
-	OGRDataSource* poDS = poDriver->Open( "D:\\420107.dxf", NULL );
-	if( poDS == NULL )
+	poDS = poDriver->Open(filePath, NULL);
+	if(poDS == NULL )
 	{
 		printf( "Open failed.\n%s" );
 		exit(-1);
 	}
 
-	/****************/
+	OGRLayer *poLayer = poDS->GetLayer(0); //读取层
+	poLayer->ResetReading(); //遍历要素重置
+	printf("Layercount: %d\n", poDS->GetLayerCount()); //输出层数目
 
+	vector<long> vecFIDs;
+	OGREnvelope envelope;
+	envelope.MinX = envelope.MinY = envelope.MaxX = envelope.MaxY = 0;
+	ConvertPolylineToPolygonEx(writePath, poLayer, envelope, vecFIDs, NULL);
+
+	//释放内存
+	OGRDataSource::DestroyDataSource(poDS);
+	poDS = nullptr;
 
 	system("pause");
 
